@@ -61,3 +61,10 @@ linphone62*.log
 *.cxxflags
 *.files
 *.includes
+
+# >>> fork-local: agent tooling tracked in the fork only (stripped from upstream PRs)
+!.fork-local
+!.claude/
+.claude/settings.local.json
+.claude/worktrees/
+# <<< fork-local

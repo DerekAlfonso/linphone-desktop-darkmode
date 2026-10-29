@@ -1,0 +1,13 @@
+# Fork-local paths: committed to the DerekAlfonso fork, never sent upstream.
+#
+# One path per line, relative to the repo root. A trailing "/" means the whole
+# directory. Globs (*, **) are allowed. Blank lines and "#" comments are ignored.
+#
+# Edits to files that DO exist upstream (e.g. .gitignore) can be kept fork-only by
+# wrapping them in marker lines containing ">>> fork-local" and "<<< fork-local".
+# The upstream-pr skill strips those blocks.
+
+.fork-local
+AGENTS.md
+CLAUDE.md
+.claude/
