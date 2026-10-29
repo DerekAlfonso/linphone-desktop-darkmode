@@ -15,12 +15,13 @@ FocusScope {
 	property var currentCall
 	property bool lastRowVisible: true
 
-	onButtonPressed: (text) => {
-		if (currentCall) currentCall.core.lSendDtmf(text)
-	}
 	signal buttonPressed(string text)
 	signal launchCall()
 	signal wipe()
+
+	function firstKey() {
+		return numPadGrid.getButtonAt(0)
+	}
 
 	function keypadKeyPressedAtIndex(index) {
 		var button = numPadGrid.getButtonAt(index)

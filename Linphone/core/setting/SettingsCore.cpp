@@ -49,6 +49,7 @@ SettingsCore::SettingsCore(QObject *parent) : QObject(parent) {
 	// Call
 	mVideoEnabled = settingsModel->getVideoEnabled();
 	mEchoCancellationEnabled = settingsModel->getEchoCancellationEnabled();
+	mHidEnabled = settingsModel->getHidEnabled();
 	mNoiseSuppressionEnabled = settingsModel->getNoiseSuppressionEnabled();
 	mAutoDownloadReceivedFiles = settingsModel->getAutoDownloadReceivedFiles();
 	mDisplayNotificationContent = settingsModel->getDisplayNotificationContent();
@@ -116,7 +117,7 @@ SettingsCore::SettingsCore(QObject *parent) : QObject(parent) {
 	auto currentAccount = CoreModel::getInstance()->getCore()->getDefaultAccount();
 	if (currentAccount) {
 		auto accountDomain = Utils::coreStringToAppString(currentAccount->getParams()->getDomain());
-		mShowAccountDevices = (accountDomain == mDefaultDomain);
+		mShowAccountDevices = (accountDomain == mDefaultDomain) && !settingsModel->getAccountCreatorUrl().isEmpty();
 		mDisableMeetingsFeature = settingsModel->getDisableMeetingsFeature() ||
 		                          !currentAccount->getParams()->getAudioVideoConferenceFactoryAddress();
 	}
@@ -126,7 +127,7 @@ SettingsCore::SettingsCore(QObject *parent) : QObject(parent) {
 	mTextMessageFont = settingsModel->getTextMessageFont();
 
 	// Check for update
-	mIsCheckForUpdateAvailable = settingsModel->isCheckForUpdateAvailable();
+	mIsCheckForUpdateEnabled = settingsModel->isCheckForUpdateEnabled();
 	mAutoCheckForUpdateOnStart = settingsModel->autoCheckForUpdateOnStart();
 
 	// Ui
@@ -139,6 +140,7 @@ SettingsCore::SettingsCore(QObject *parent) : QObject(parent) {
 	INIT_CORE_MEMBER(DisableCallRecordings, settingsModel)
 	INIT_CORE_MEMBER(AssistantHideCreateAccount, settingsModel)
 	INIT_CORE_MEMBER(AssistantDisableQrCode, settingsModel)
+	INIT_CORE_MEMBER(HideNotificationCounter, settingsModel)
 
 	INIT_CORE_MEMBER(AssistantHideThirdPartyAccount, settingsModel)
 	INIT_CORE_MEMBER(HideSipAddresses, settingsModel)
@@ -176,6 +178,7 @@ SettingsCore::SettingsCore(const SettingsCore &settingsCore) {
 	// Call
 	mVideoEnabled = settingsCore.mVideoEnabled;
 	mEchoCancellationEnabled = settingsCore.mEchoCancellationEnabled;
+	mHidEnabled = settingsCore.mHidEnabled;
 	mNoiseSuppressionEnabled = settingsCore.mNoiseSuppressionEnabled;
 	mAutoDownloadReceivedFiles = settingsCore.mAutoDownloadReceivedFiles;
 	mDisplayNotificationContent = settingsCore.mDisplayNotificationContent;
@@ -219,6 +222,7 @@ SettingsCore::SettingsCore(const SettingsCore &settingsCore) {
 
 	// UI
 	mDisableChatFeature = settingsCore.mDisableChatFeature;
+	mHideNotificationCounter = settingsCore.mHideNotificationCounter;
 	mDisableMeetingsFeature = settingsCore.mDisableMeetingsFeature;
 	mShowPastMeetings = settingsCore.mShowPastMeetings;
 	mDisableBroadcastFeature = settingsCore.mDisableBroadcastFeature;
@@ -329,7 +333,7 @@ void SettingsCore::reloadSettings() {
 	auto currentAccount = CoreModel::getInstance()->getCore()->getDefaultAccount();
 	if (currentAccount) {
 		auto accountDomain = Utils::coreStringToAppString(currentAccount->getParams()->getDomain());
-		setShowAccountDevices(accountDomain == mDefaultDomain);
+		setShowAccountDevices((accountDomain == mDefaultDomain) && !settingsModel->getAccountCreatorUrl().isEmpty());
 		setDisableMeetingsFeature(settingsModel->getDisableMeetingsFeature() ||
 		                          !currentAccount->getParams()->getAudioVideoConferenceFactoryAddress());
 	}
@@ -339,10 +343,11 @@ void SettingsCore::reloadSettings() {
 	mTextMessageFont = settingsModel->getTextMessageFont();
 
 	// Check for update
-	mIsCheckForUpdateAvailable = settingsModel->isCheckForUpdateAvailable();
+	mIsCheckForUpdateEnabled = settingsModel->isCheckForUpdateEnabled();
 	mAutoCheckForUpdateOnStart = settingsModel->autoCheckForUpdateOnStart();
 
 	setDisableChatFeature(settingsModel->getDisableChatFeature());
+	setHideNotificationCounter(settingsModel->getHideNotificationCounter());
 	setShowPastMeetings(settingsModel->getShowPastMeetings());
 	setDisableBroadcastFeature(settingsModel->getDisableBroadcastFeature());
 	setDisableCallForward(settingsModel->getDisableCallForward());
@@ -403,6 +408,11 @@ void SettingsCore::setSelf(QSharedPointer<SettingsCore> me) {
 	    &SettingsModel::echoCancellationEnabledChanged, [this](const bool enabled) {
 		    mSettingsModelConnection->invokeToCore([this, enabled]() { setEchoCancellationEnabled(enabled); });
 	    });
+
+	// HID
+	mSettingsModelConnection->makeConnectToModel(&SettingsModel::hidEnabledChanged, [this](const bool enabled) {
+		mSettingsModelConnection->invokeToCore([this, enabled]() { setHidEnabled(enabled); });
+	});
 
 	// Noise suppression
 	mSettingsModelConnection->makeConnectToModel(
@@ -644,6 +654,8 @@ void SettingsCore::setSelf(QSharedPointer<SettingsCore> me) {
 
 	DEFINE_CORE_GETSET_CONNECT(mSettingsModelConnection, SettingsCore, SettingsModel, settingsModel, bool,
 	                           disableChatFeature, DisableChatFeature)
+	DEFINE_CORE_GETSET_CONNECT(mSettingsModelConnection, SettingsCore, SettingsModel, settingsModel, bool,
+	                           hideNotificationCounter, HideNotificationCounter)
 	DEFINE_CORE_GET_CONNECT(mSettingsModelConnection, SettingsCore, SettingsModel, settingsModel, bool,
 	                        showPastMeetings, ShowPastMeetings)
 	DEFINE_CORE_GETSET_CONNECT(mSettingsModelConnection, SettingsCore, SettingsModel, settingsModel, bool,
@@ -723,8 +735,10 @@ void SettingsCore::setSelf(QSharedPointer<SettingsCore> me) {
 		    if (account) {
 			    accountDomain = Utils::coreStringToAppString(account->getParams()->getDomain());
 		    }
-		    mSettingsModelConnection->invokeToCore(
-		        [this, accountDomain]() { setShowAccountDevices(accountDomain == mDefaultDomain); });
+		    bool haveAccountCreatorUrl = !SettingsModel::getInstance()->getAccountCreatorUrl().isEmpty();
+		    mSettingsModelConnection->invokeToCore([this, accountDomain, haveAccountCreatorUrl]() {
+			    setShowAccountDevices((accountDomain == mDefaultDomain) && haveAccountCreatorUrl);
+		    });
 	    });
 }
 
@@ -735,6 +749,7 @@ void SettingsCore::reset(const SettingsCore &settingsCore) {
 	// Call
 	setVideoEnabled(settingsCore.mVideoEnabled);
 	setEchoCancellationEnabled(settingsCore.mEchoCancellationEnabled);
+	setHidEnabled(settingsCore.mHidEnabled);
 	setNoiseSuppressionEnabled(settingsCore.mNoiseSuppressionEnabled);
 	setAutomaticallyRecordCallsEnabled(settingsCore.mAutomaticallyRecordCallsEnabled);
 	setAutoAnswerEnabled(settingsCore.mAutoAnswerEnabled);
@@ -780,6 +795,7 @@ void SettingsCore::reset(const SettingsCore &settingsCore) {
 
 	// UI
 	setDisableChatFeature(settingsCore.mDisableChatFeature);
+	setHideNotificationCounter(settingsCore.mHideNotificationCounter);
 	setDisableMeetingsFeature(settingsCore.mDisableMeetingsFeature);
 	setShowPastMeetings(settingsCore.mShowPastMeetings);
 	setDisableBroadcastFeature(settingsCore.mDisableBroadcastFeature);
@@ -862,6 +878,14 @@ void SettingsCore::setEchoCancellationEnabled(bool enabled) {
 	if (mEchoCancellationEnabled != enabled) {
 		mEchoCancellationEnabled = enabled;
 		emit echoCancellationEnabledChanged();
+		setIsSaved(false);
+	}
+}
+
+void SettingsCore::setHidEnabled(bool enabled) {
+	if (mHidEnabled != enabled) {
+		mHidEnabled = enabled;
+		emit hidEnabledChanged();
 		setIsSaved(false);
 	}
 }
@@ -1383,6 +1407,10 @@ void SettingsCore::setShowPastMeetings(bool show) {
 	}
 }
 
+bool SettingsCore::getHideNotificationCounter() const {
+	return mHideNotificationCounter;
+}
+
 bool SettingsCore::getExitOnClose() const {
 	return mExitOnClose;
 }
@@ -1431,6 +1459,7 @@ void SettingsCore::writeIntoModel(std::shared_ptr<SettingsModel> model) const {
 	// Call
 	model->setVideoEnabled(mVideoEnabled);
 	model->setEchoCancellationEnabled(mEchoCancellationEnabled);
+	model->setHidEnabled(mHidEnabled);
 	model->setNoiseSuppressionEnabled(mNoiseSuppressionEnabled);
 	model->setAutomaticallyRecordCallsEnabled(mAutomaticallyRecordCallsEnabled);
 	model->setAutoAnswerEnabled(mAutoAnswerEnabled);
@@ -1469,6 +1498,7 @@ void SettingsCore::writeIntoModel(std::shared_ptr<SettingsModel> model) const {
 
 	// UI
 	model->setDisableChatFeature(mDisableChatFeature);
+	model->setHideNotificationCounter(mHideNotificationCounter);
 	// model->setDisableMeetingsFeature(mDisableMeetingsFeature);
 	model->setShowPastMeetings(mShowPastMeetings);
 	model->setDisableBroadcastFeature(mDisableBroadcastFeature);
@@ -1506,6 +1536,7 @@ void SettingsCore::writeFromModel(const std::shared_ptr<SettingsModel> &model) {
 	// Call
 	mVideoEnabled = model->getVideoEnabled();
 	mEchoCancellationEnabled = model->getEchoCancellationEnabled();
+	mHidEnabled = model->getHidEnabled();
 	mNoiseSuppressionEnabled = model->getNoiseSuppressionEnabled();
 	mAutomaticallyRecordCallsEnabled = model->getAutomaticallyRecordCallsEnabled();
 	mAutoAnswerEnabled = model->getAutoAnswerEnabled();
@@ -1556,11 +1587,11 @@ void SettingsCore::writeFromModel(const std::shared_ptr<SettingsModel> &model) {
 	mLogsEmail = model->getLogsEmail();
 
 	// Check update
-	mIsCheckForUpdateAvailable = model->isCheckForUpdateAvailable();
+	mIsCheckForUpdateEnabled = model->isCheckForUpdateEnabled();
 	mAutoCheckForUpdateOnStart = model->autoCheckForUpdateOnStart();
 
 	// UI
-	mDisableChatFeature = model->getDisableChatFeature();
+	mHideNotificationCounter = model->getHideNotificationCounter();
 	// mDisableMeetingsFeature = model->getDisableMeetingsFeature();
 	mShowPastMeetings = model->getShowPastMeetings();
 	mDisableBroadcastFeature = model->getDisableBroadcastFeature();
@@ -1591,8 +1622,8 @@ void SettingsCore::writeFromModel(const std::shared_ptr<SettingsModel> &model) {
 	mCallForwardToAddress = model->getCallForwardToAddress();
 }
 
-bool SettingsCore::isCheckForUpdateAvailable() const {
-	return mIsCheckForUpdateAvailable;
+bool SettingsCore::isCheckForUpdateEnabled() const {
+	return mIsCheckForUpdateEnabled;
 }
 
 bool SettingsCore::autoCheckForUpdateOnStart() const {

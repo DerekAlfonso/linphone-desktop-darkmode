@@ -36,12 +36,6 @@
 #include "model/tool/ToolModel.hpp"
 #include "tool/Utils.hpp"
 
-#if defined(Q_OS_MACOS)
-#include "core/event-count-notifier/EventCountNotifierMacOs.hpp"
-#else
-#include "core/event-count-notifier/EventCountNotifierSystemTrayIcon.hpp"
-#endif // if defined(Q_OS_MACOS)
-
 // =============================================================================
 DEFINE_ABSTRACT_OBJECT(CoreModel)
 
@@ -368,6 +362,16 @@ void CoreModel::migrate() {
 		lInfo() << log().arg("Migrating) Video Policy for version 7.");
 	}
 
+	if (rcVersion < 9) {
+		config->setInt("video", "automatically_accept_direction", 2);
+		auto videoPolicy = mCore->getVideoActivationPolicy()->clone();
+		videoPolicy->setAutomaticallyAccept(config->getBool("video", "automatically_accept", true));
+		videoPolicy->setAutomaticallyInitiate(config->getBool("video", "automatically_initiate", false));
+		videoPolicy->setAutomaticallyAcceptDirection(linphone::MediaDirection::RecvOnly);
+		mCore->setVideoActivationPolicy(videoPolicy);
+		lInfo() << log().arg("Migrating Video Policy for version 9. automatically_accept_direction = 2");
+	}
+
 	config->setInt(SettingsModel::UiSection, Constants::RcVersionName, Constants::RcVersionCurrent);
 }
 
@@ -382,9 +386,8 @@ void CoreModel::checkForUpdate(const std::string &applicationVersion, bool reque
 	mCheckVersionRequestedByUser = requestedByUser;
 	auto settingsModel = SettingsModel::getInstance();
 	if (settingsModel->isCheckForUpdateEnabled()) {
-		if (settingsModel->getVersionCheckUrl().isEmpty())
-			settingsModel->setVersionCheckUrl(Constants::VersionCheckReleaseUrl);
-		lInfo() << log().arg("Checking for update for version") << applicationVersion;
+		lInfo() << log().arg("Checking for update for version") << applicationVersion << "on"
+		        << settingsModel->getVersionCheckUrl();
 		getCore()->checkForUpdate(applicationVersion);
 	} else {
 		lInfo() << log().arg("Check for update settings is not set");

@@ -555,6 +555,17 @@ void SettingsModel::setEchoCancellationEnabled(bool status) {
 	emit echoCancellationEnabledChanged(status);
 }
 
+bool SettingsModel::getHidEnabled() const {
+	mustBeInLinphoneThread(log().arg(Q_FUNC_INFO));
+	return CoreModel::getInstance()->getCore()->hidEnabled();
+}
+
+void SettingsModel::setHidEnabled(bool status) {
+	mustBeInLinphoneThread(log().arg(Q_FUNC_INFO));
+	CoreModel::getInstance()->getCore()->enableHid(status);
+	emit hidEnabledChanged(status);
+}
+
 bool SettingsModel::getNoiseSuppressionEnabled() const {
 	mustBeInLinphoneThread(log().arg(Q_FUNC_INFO));
 	return CoreModel::getInstance()->getCore()->noiseSuppressionEnabled();
@@ -917,6 +928,10 @@ void SettingsModel::setShortcuts(const QVariantList &data) {
 	}
 }
 
+QString SettingsModel::getAccountCreatorUrl() const {
+	return Utils::coreStringToAppString(mConfig->getString("account_creator", "url", ""));
+}
+
 QString SettingsModel::getDefaultDomain() const {
 	return Utils::coreStringToAppString(
 	    mConfig->getString(SettingsModel::AppSection, "default_domain", "sip.linphone.org"));
@@ -1000,7 +1015,7 @@ void SettingsModel::setShowPastMeetings(bool show) {
 }
 
 bool SettingsModel::autoCheckForUpdateOnStart() const {
-	return !!mConfig->getInt(UiSection, "auto_check_for_update_on_start", isCheckForUpdateAvailable());
+	return !!mConfig->getInt(UiSection, "auto_check_for_update_on_start", isCheckForUpdateEnabled());
 }
 
 void SettingsModel::setAutoCheckForUpdateOnStart(bool check) {
@@ -1008,30 +1023,12 @@ void SettingsModel::setAutoCheckForUpdateOnStart(bool check) {
 	emit autoCheckForUpdateOnStartChanged();
 }
 
-bool SettingsModel::isCheckForUpdateAvailable() const {
-#ifdef ENABLE_UPDATE_CHECK
-	return true;
-#else
-	return false;
-#endif
-}
-
 bool SettingsModel::isCheckForUpdateEnabled() const {
-	return !!mConfig->getInt(UiSection, "check_for_update_enabled", isCheckForUpdateAvailable());
-}
-
-void SettingsModel::setCheckForUpdateEnabled(bool enable) {
-	mConfig->setInt(UiSection, "check_for_update_enabled", enable);
-	emit checkForUpdateEnabledChanged();
+	return !mConfig->getString("misc", "version_check_url_root", "").empty();
 }
 
 QString SettingsModel::getVersionCheckUrl() {
-	auto url = mConfig->getString("misc", "version_check_url_root", "");
-	if (url == "") {
-		url = Constants::VersionCheckReleaseUrl;
-		if (url != "") mConfig->setString("misc", "version_check_url_root", url);
-	}
-	return Utils::coreStringToAppString(url);
+	return Utils::coreStringToAppString(mConfig->getString("misc", "version_check_url_root", ""));
 }
 
 void SettingsModel::setVersionCheckUrl(const QString &url) {
@@ -1125,6 +1122,7 @@ void SettingsModel::notifyConfigReady(){
 
 DEFINE_GETSET_CONFIG(SettingsModel, bool, Bool, disableChatFeature, DisableChatFeature, "disable_chat_feature", false)
 DEFINE_GETSET_CONFIG(SettingsModel, bool, Bool, hideNotificationCounter, HideNotificationCounter, "hide_systray_notification_counter", false)
+DEFINE_GETSET_CONFIG(SettingsModel, bool, Bool, forceLocalConference, ForceLocalConference, "force_local_conference", false)
 DEFINE_GETSET_CONFIG(SettingsModel,
 						bool,
 						Bool,

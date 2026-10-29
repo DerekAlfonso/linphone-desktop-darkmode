@@ -35,6 +35,7 @@ class SettingsCore : public QObject, public AbstractObject {
 public:
 	// Security
 	Q_PROPERTY(bool vfsEnabled READ getVfsEnabled WRITE setVfsEnabled NOTIFY vfsEnabledChanged)
+	Q_PROPERTY(bool checkForUpdateEnabled READ isCheckForUpdateEnabled CONSTANT)
 
 	// Call
 	Q_PROPERTY(bool disableMeetingsFeature READ getDisableMeetingsFeature WRITE setDisableMeetingsFeature NOTIFY
@@ -42,6 +43,7 @@ public:
 	Q_PROPERTY(bool videoEnabled READ getVideoEnabled WRITE setVideoEnabled NOTIFY videoEnabledChanged)
 	Q_PROPERTY(bool echoCancellationEnabled READ getEchoCancellationEnabled WRITE setEchoCancellationEnabled NOTIFY
 	               echoCancellationEnabledChanged)
+	Q_PROPERTY(bool hidEnabled READ getHidEnabled WRITE setHidEnabled NOTIFY hidEnabledChanged)
 	Q_PROPERTY(bool noiseSuppressionEnabled READ getNoiseSuppressionEnabled WRITE setNoiseSuppressionEnabled NOTIFY
 	               noiseSuppressionEnabledChanged)
 	Q_PROPERTY(bool showPastMeetings READ getShowPastMeetings WRITE setShowPastMeetings NOTIFY showPastMeetingsChanged)
@@ -94,39 +96,36 @@ public:
 	Q_PROPERTY(
 	    QVariantMap conferenceLayout READ getConferenceLayout WRITE setConferenceLayout NOTIFY conferenceLayoutChanged)
 	Q_PROPERTY(
-	    QVariantMap mediaEncryption READ getMediaEncryption WRITE setMediaEncryption NOTIFY
-	        mediaEncryptionChanged) Q_PROPERTY(bool mediaEncryptionMandatory READ isMediaEncryptionMandatory WRITE
-	                                               setMediaEncryptionMandatory NOTIFY mediaEncryptionMandatoryChanged)
-	    Q_PROPERTY(
-	        bool createEndToEndEncryptedMeetingsAndGroupCalls READ getCreateEndToEndEncryptedMeetingsAndGroupCalls WRITE
-	            setCreateEndToEndEncryptedMeetingsAndGroupCalls NOTIFY
-	                createEndToEndEncryptedMeetingsAndGroupCallsChanged)
+	    QVariantMap mediaEncryption READ getMediaEncryption WRITE setMediaEncryption NOTIFY mediaEncryptionChanged)
+	Q_PROPERTY(
+	    bool mediaEncryptionMandatory READ isMediaEncryptionMandatory WRITE setMediaEncryptionMandatory NOTIFY
+	        mediaEncryptionMandatoryChanged) Q_PROPERTY(bool createEndToEndEncryptedMeetingsAndGroupCalls READ
+	                                                        getCreateEndToEndEncryptedMeetingsAndGroupCalls WRITE
+	                                                            setCreateEndToEndEncryptedMeetingsAndGroupCalls NOTIFY
+	                                                                createEndToEndEncryptedMeetingsAndGroupCallsChanged)
 
-	        Q_PROPERTY(QStringList videoDevices READ getVideoDevices NOTIFY videoDevicesChanged) Q_PROPERTY(
-	            QString videoDevice READ getVideoDevice WRITE setVideoDevice NOTIFY videoDeviceChanged)
-	            Q_PROPERTY(int videoDeviceIndex READ getVideoDeviceIndex NOTIFY videoDeviceChanged)
+	    Q_PROPERTY(QStringList videoDevices READ getVideoDevices NOTIFY videoDevicesChanged) Q_PROPERTY(
+	        QString videoDevice READ getVideoDevice WRITE setVideoDevice NOTIFY
+	            videoDeviceChanged) Q_PROPERTY(int videoDeviceIndex READ getVideoDeviceIndex NOTIFY videoDeviceChanged)
 
-	                Q_PROPERTY(float micVolume MEMBER _dummy_int NOTIFY micVolumeChanged)
+	        Q_PROPERTY(float micVolume MEMBER _dummy_int NOTIFY micVolumeChanged)
 
-	                    Q_PROPERTY(
-	                        bool logsEnabled READ getLogsEnabled WRITE setLogsEnabled NOTIFY
-	                            logsEnabledChanged) Q_PROPERTY(bool fullLogsEnabled READ getFullLogsEnabled WRITE
-	                                                               setFullLogsEnabled NOTIFY fullLogsEnabledChanged)
-	                        Q_PROPERTY(
-	                            bool crashReporterEnabled READ getCrashReporterEnabled WRITE setCrashReporterEnabled
-	                                NOTIFY crashReporterEnabledChanged) Q_PROPERTY(QString logsEmail READ getLogsEmail)
-	                            Q_PROPERTY(QString logsFolder READ getLogsFolder) Q_PROPERTY(
-	                                QString ringtoneName READ getRingtoneFileName NOTIFY
-	                                    ringtoneChanged) Q_PROPERTY(QString ringtonePath READ getRingtonePath WRITE
-	                                                                    setRingtone NOTIFY ringtoneChanged)
-	                                Q_PROPERTY(QString ringtoneFolder MEMBER mRingtoneFolder NOTIFY ringtoneChanged)
-	                                    Q_PROPERTY(bool dnd READ dndEnabled WRITE lEnableDnd NOTIFY dndChanged)
-	                                        Q_PROPERTY(bool isSaved READ isSaved WRITE setIsSaved NOTIFY isSavedChanged)
+	            Q_PROPERTY(bool logsEnabled READ getLogsEnabled WRITE setLogsEnabled NOTIFY
+	                           logsEnabledChanged) Q_PROPERTY(bool fullLogsEnabled READ getFullLogsEnabled WRITE
+	                                                              setFullLogsEnabled NOTIFY fullLogsEnabledChanged)
+	                Q_PROPERTY(bool crashReporterEnabled READ getCrashReporterEnabled WRITE setCrashReporterEnabled
+	                               NOTIFY crashReporterEnabledChanged) Q_PROPERTY(QString logsEmail READ getLogsEmail)
+	                    Q_PROPERTY(QString logsFolder READ getLogsFolder)
+	                        Q_PROPERTY(QString ringtoneName READ getRingtoneFileName NOTIFY ringtoneChanged) Q_PROPERTY(
+	                            QString ringtonePath READ getRingtonePath WRITE setRingtone NOTIFY ringtoneChanged)
+	                            Q_PROPERTY(QString ringtoneFolder MEMBER mRingtoneFolder NOTIFY ringtoneChanged)
+	                                Q_PROPERTY(bool dnd READ dndEnabled WRITE lEnableDnd NOTIFY dndChanged)
+	                                    Q_PROPERTY(bool isSaved READ isSaved WRITE setIsSaved NOTIFY isSavedChanged)
 
-	                                            Q_PROPERTY(bool showAccountDevices READ showAccountDevices WRITE
-	                                                           setShowAccountDevices NOTIFY showAccountDevicesChanged)
+	                                        Q_PROPERTY(bool showAccountDevices READ showAccountDevices WRITE
+	                                                       setShowAccountDevices NOTIFY showAccountDevicesChanged)
 
-	                                                static QSharedPointer<SettingsCore> create();
+	                                            static QSharedPointer<SettingsCore> create();
 	SettingsCore(QObject *parent = Q_NULLPTR);
 	SettingsCore(const SettingsCore &settingsCore);
 	virtual ~SettingsCore();
@@ -168,6 +167,11 @@ public:
 		return mEchoCancellationEnabled;
 	}
 	void setEchoCancellationEnabled(bool enabled);
+
+	bool getHidEnabled() {
+		return mHidEnabled;
+	}
+	void setHidEnabled(bool enabled);
 
 	bool getNoiseSuppressionEnabled() {
 		return mNoiseSuppressionEnabled;
@@ -334,12 +338,13 @@ public:
 	bool getCardDAVMinCharForResearch() const;
 	void setCardDAVMinCharForResearch(int min);
 
-	bool isCheckForUpdateAvailable() const;
+	bool isCheckForUpdateEnabled() const;
 	bool autoCheckForUpdateOnStart() const;
 	Q_INVOKABLE void save();
 	Q_INVOKABLE void undo();
 
 	DECLARE_CORE_GETSET_MEMBER(bool, disableChatFeature, DisableChatFeature)
+	DECLARE_CORE_GETSET(bool, hideNotificationCounter, HideNotificationCounter)
 	DECLARE_CORE_GETSET_MEMBER(bool, disableBroadcastFeature, DisableBroadcastFeature)
 	DECLARE_CORE_GETSET_MEMBER(bool, disableCallForward, DisableCallForward)
 	DECLARE_CORE_GETSET_MEMBER(bool, hideSettings, HideSettings)
@@ -379,6 +384,7 @@ signals:
 	void videoEnabledChanged();
 
 	void echoCancellationEnabledChanged();
+	void hidEnabledChanged();
 	void noiseSuppressionEnabledChanged();
 	void autoDownloadReceivedFilesChanged();
 	void downloadFolderChanged();
@@ -492,6 +498,7 @@ private:
 	// Call
 	bool mVideoEnabled;
 	bool mEchoCancellationEnabled;
+	bool mHidEnabled;
 	bool mNoiseSuppressionEnabled;
 	bool mAutoDownloadReceivedFiles;
 	QString mDownloadFolder;
@@ -565,7 +572,7 @@ private:
 	int mCardDAVMinCharForResearch = 0;
 
 	// Check update
-	bool mIsCheckForUpdateAvailable = false;
+	bool mIsCheckForUpdateEnabled = false;
 	bool mAutoCheckForUpdateOnStart = false;
 
 	DECLARE_ABSTRACT_OBJECT

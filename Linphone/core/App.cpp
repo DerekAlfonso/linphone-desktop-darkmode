@@ -20,8 +20,6 @@
 
 #include "tool/LinphoneEnums.hpp"
 
-#include "App.hpp"
-
 #include <QCoreApplication>
 #include <QDirIterator>
 #include <QFileSelector>
@@ -102,7 +100,9 @@
 #include "tool/EnumsToString.hpp"
 #include "tool/Utils.hpp"
 #include "tool/accessibility/AccessibilityHelper.hpp"
+#include "tool/accessibility/EnterKeyActivator.hpp"
 #include "tool/accessibility/FocusHelper.hpp"
+#include "tool/accessibility/FocusTrap.hpp"
 #include "tool/accessibility/KeyboardShortcuts.hpp"
 #ifdef HAVE_CRASH_HANDLER
 #include "tool/crash_reporter/CrashReporter.hpp"
@@ -122,6 +122,7 @@
 #if defined(Q_OS_MACOS)
 #include "core/event-count-notifier/EventCountNotifierMacOs.hpp"
 #else
+#include "App.hpp"
 #include "core/event-count-notifier/EventCountNotifierSystemTrayIcon.hpp"
 #endif // if defined(Q_OS_MACOS)
 
@@ -433,7 +434,6 @@ void App::connectCoreModel() {
 					    mEngine->clearComponentCache();
 				    }
 			    } else if (gstate == linphone::GlobalState::Off) {
-				    CoreModel::getInstance()->getCore()->stopHidDevicesDetection();
 			    }
 		    });
 	    });
@@ -495,9 +495,6 @@ void App::connectCoreModel() {
 		mCoreModelConnection->invokeToCore([this, state] {
 			setCoreGlobalState((int)state);
 			setCoreStarted(state == linphone::GlobalState::On);
-			if (state == linphone::GlobalState::Off) {
-				CoreModel::getInstance()->getCore()->stopHidDevicesDetection();
-			}
 		});
 	});
 
@@ -727,8 +724,6 @@ void App::initCore() {
 				    assert(mEngine);
 			    }
 			    mSettings = settings;
-			    lDebug() << log().arg("Starting HID devices detection");
-			    CoreModel::getInstance()->getCore()->startHidDevicesDetection();
 			    // Provide `+custom` folders for custom components and `5.9` for old components.
 			    QStringList selectors("custom");
 			    const QVersionNumber &version = QLibraryInfo::version();
@@ -761,6 +756,7 @@ void App::initCore() {
 			    mEngine->rootContext()->setContextProperty("applicationName", APPLICATION_NAME);
 			    mEngine->rootContext()->setContextProperty("executableName", EXECUTABLE_NAME);
 			    mEngine->rootContext()->setContextProperty("FocusNavigator", new FocusNavigator(mEngine));
+			    new EnterKeyActivator(mEngine);
 
 			    // if (!isRestarting()) {
 			    initCppInterfaces();
@@ -946,6 +942,7 @@ void App::initCore() {
 }
 
 static inline bool installLocale(App &app, QTranslator &translator, const QLocale &locale) {
+	lInfo() << QStringLiteral("install locale %1").arg(locale.name());
 	bool ok = translator.load(locale.name(), Constants::LanguagePath);
 	ok = ok && app.installTranslator(&translator);
 	if (ok) QLocale::setDefault(locale);
@@ -980,6 +977,7 @@ void App::initLocale() {
 	//	QLocale sysLocale = QLocale(qtLocale.join('_'));
 	// #else
 	QByteArray forcedLanguage = qgetenv("LINPHONE_FORCE_LANGUAGE");
+	lInfo() << log().arg("LINPHONE_FORCE_LANGUAGE=%1").arg(forcedLanguage);
 	QLocale sysLocale =
 	    forcedLanguage.isEmpty() ? QLocale(QLocale::system().name()) : QLocale(QString::fromUtf8(forcedLanguage));
 	if (installLocale(*this, *mTranslatorCore, sysLocale)) {
@@ -1024,6 +1022,7 @@ void App::initCppInterfaces() {
 	    [](QQmlEngine *engine, QJSEngine *) -> QObject * { return new AccessibilityHelper(engine); });
 
 	qmlRegisterType<FocusHelper>("CustomControls", 1, 0, "FocusHelper");
+	qmlRegisterType<FocusTrap>("CustomControls", 1, 0, "FocusTrap");
 
 	qmlRegisterType<DashRectangle>(Constants::MainQmlUri, 1, 0, "DashRectangle");
 	qmlRegisterType<PhoneNumberProxy>(Constants::MainQmlUri, 1, 0, "PhoneNumberProxy");
@@ -1443,9 +1442,32 @@ QSharedPointer<AccountList> App::getAccountList() const {
 
 void App::setAccountList(QSharedPointer<AccountList> data) {
 	if (mAccountList != data) {
+		if (mAccountList)
+			disconnect(mAccountList.get(), &AccountList::defaultAccountChanged, this,
+			           &App::trackDefaultAccountForSysTray);
 		mAccountList = data;
+		if (mAccountList)
+			connect(mAccountList.get(), &AccountList::defaultAccountChanged, this, &App::trackDefaultAccountForSysTray);
+		trackDefaultAccountForSysTray();
 		emit accountsChanged();
 	}
+}
+
+void App::trackDefaultAccountForSysTray() {
+	QObject::disconnect(mSysTrayAccountConnection);
+	auto account = mAccountList ? mAccountList->getDefaultAccountCore() : nullptr;
+	if (account)
+		mSysTrayAccountConnection =
+		    connect(account.get(), &AccountCore::registrationStateChanged, this, &App::updateSysTrayToolTip);
+	updateSysTrayToolTip();
+}
+
+void App::updateSysTrayToolTip() {
+	if (!mSystemTrayIcon) return;
+	QString toolTip = APPLICATION_NAME;
+	auto account = mAccountList ? mAccountList->getDefaultAccountCore() : nullptr;
+	if (account) toolTip += " - " + account->getHumanReadableRegistrationState();
+	mSystemTrayIcon->setToolTip(toolTip);
 }
 
 AccountList *App::getAccounts() const {
@@ -1743,7 +1765,7 @@ void App::setSysTrayIcon() {
 	}
 	menu->addAction(markAllReadAction);
 	//: Check for update
-	if (mSettings->isCheckForUpdateAvailable()) {
+	if (mSettings->isCheckForUpdateEnabled()) {
 		QAction *checkForUpdateAction = new QAction(tr("check_for_update"), root);
 		root->connect(checkForUpdateAction, &QAction::triggered, this, [this] { checkForUpdate(true); });
 		menu->addAction(checkForUpdateAction);
@@ -1764,6 +1786,7 @@ void App::setSysTrayIcon() {
 	systemTrayIcon->setToolTip(APPLICATION_NAME);
 	systemTrayIcon->show();
 	if (!mSystemTrayIcon) mSystemTrayIcon = systemTrayIcon;
+	updateSysTrayToolTip();
 	if (!QSystemTrayIcon::isSystemTrayAvailable()) qInfo() << "System tray is not available";
 
 //

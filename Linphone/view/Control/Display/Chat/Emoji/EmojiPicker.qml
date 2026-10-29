@@ -36,8 +36,6 @@ ColumnLayout {
     property var editor
     property EmojiModel model: EmojiModel {
         id: emojiModel
-        iconsPath: "image://emoji/emojiSvgs/"
-        iconsType: '.svg'
     }
     property var categories: ['Smileys & Emotion', 'People & Body', 'Animals & Nature',
         'Food & Drink', 'Activities', 'Travel & Places', 'Objects', 'Symbols', 'Flags']
@@ -59,7 +57,7 @@ ColumnLayout {
         searchModel.clear()
         var searchResult = model.search(searchField.text, skinColor)
         for (var i = 0; i < searchResult.length; ++i) {
-            searchModel.append({path: searchResult[i]})
+            searchModel.append({emoji: searchResult[i]})
         }
     }
     function clearSearchField() {
@@ -198,19 +196,25 @@ ColumnLayout {
             }
             Repeater {
                 model: mainItem.searchMode ? mainItem.searchModel : mainItem.model.count(grid.category)
-                delegate: Rectangle  {
+                delegate: Rectangle {
+                    id: emojiItem
+                    property string emojiText: mainItem.searchMode
+                        ? emoji
+                        : mainItem.model.emoji(grid.category, index, grid.sc)
                     Layout.preferredWidth: Utils.getSizeWithScreenRatio(40)
                     Layout.preferredHeight: Utils.getSizeWithScreenRatio(40)
                     radius: Utils.getSizeWithScreenRatio(40)
                     color: mouseArea.containsMouse ? '#e6e6e6' : '#ffffff'
-                    Text {
-                        id: emojiText
-                        property url source: mainItem.searchMode ? path : mainItem.model.path(grid.category, index, grid.sc)
-                        textFormat: Text.RichText
-                        anchors.centerIn: parent
-                        text: Utils.codepointFromFilename(UtilsCpp.getFilename(source))
-                        font.pixelSize: Utils.getSizeWithScreenRatio(29)
-                        font.family: DefaultStyle.emojiFont
+                    Loader {
+                        anchors.fill: parent
+                        asynchronous: true
+                        sourceComponent: Text {
+                            anchors.centerIn: parent
+                            textFormat: Text.PlainText
+                            text: emojiItem.emojiText
+                            font.pixelSize: Utils.getSizeWithScreenRatio(29)
+                            font.family: DefaultStyle.emojiFont
+                        }
                     }
                     MouseArea {
                         id: mouseArea
@@ -218,8 +222,8 @@ ColumnLayout {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            if (mainItem.editor) mainItem.editor.insert(mainItem.editor.cursorPosition, emojiText.text)
-                            mainItem.emojiClicked(emojiText.text)
+                            if (mainItem.editor) mainItem.editor.insert(mainItem.editor.cursorPosition, emojiItem.emojiText)
+                            mainItem.emojiClicked(emojiItem.emojiText)
                         }
                     }
                 }

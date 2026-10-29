@@ -8,11 +8,13 @@ import QtQuick.Controls.Basic as Control
 import Linphone
 import UtilsCpp
 import SettingsCpp
+import CustomControls 1.0
 import 'qrc:/qt/qml/Linphone/view/Control/Tool/Helper/utils.js' as Utils
 import 'qrc:/qt/qml/Linphone/view/Style/buttonStyle.js' as ButtonStyle
 
 PopupButton {
     id: presenceAndRegistrationItem
+    popUpTitle: qsTr("contact_status_accessible_name").arg(mainItem.account ? mainItem.account.core.displayName : "").arg(presenceOrRegistrationText.text)
     width: presenceOrRegistrationText.implicitWidth + Utils.getSizeWithScreenRatio(50)
     height: Utils.getSizeWithScreenRatio(24)
     enabled: mainItem.account && mainItem.account.core.registrationState === LinphoneEnums.RegistrationState.Ok

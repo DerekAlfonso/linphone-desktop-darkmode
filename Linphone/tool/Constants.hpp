@@ -53,9 +53,7 @@ public:
 
 	static constexpr size_t MaxLogsCollectionSize = 10485760 * 5; // 50MB.
 
-#ifdef ENABLE_UPDATE_CHECK
 	static constexpr int VersionUpdateCheckInterval = 86400000; // 24 hours in milliseconds.
-#endif                                                          // ifdef ENABLE_UPDATE_CHECK
 
 	static constexpr char DefaultXmlrpcUri[] = "https://subscribe.linphone.org:444/wizard.php";
 	static constexpr char DefaultUploadLogsServer[] =
@@ -192,12 +190,14 @@ public:
 	static constexpr char VcardScheme[] = EXECUTABLE_NAME "-desktop:/";
 	static constexpr int CbsCallInterval = 20;
 	static constexpr char RcVersionName[] = "rc_version";
-	static constexpr int RcVersionCurrent = 7; // 2 = Conference URI
+	static constexpr int RcVersionCurrent = 9; // 2 = Conference URI
 	                                           // 3 = CPIM on basic chat rooms
 	                                           // 4 = RTP bundle mode
 	                                           // 5 = Video Conference URI
 	                                           // 6 = 5.2.6 Publish expires
 	                                           // 7 = 6.0.0 Lime algo + Video Policy + Routes + Log upload URL
+	                                           // 8 = 5.3.x Video Policy (accept direction send/recv)
+	                                           // 9 = 6.2.x Video Policy (accept direction recv only)
 	static constexpr char DownloadDefaultFileName[] = "download";
 
 //--------------------------------------------------------------------------------

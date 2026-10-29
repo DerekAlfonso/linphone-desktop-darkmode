@@ -7,11 +7,12 @@ function ph(o){try{return o.placeholderText?String(o.placeholderText):"";}catch(
 
 export var CallPage = {
     open: function(){
-        L.click(tr("MainLayout", "open_calls_page_accessible_name"), 15000);
+        L.click(tr("MainLayout", "bottom_navigation_calls_label"), 15000);
         snooze(1);
     },
     callBySip: function(account){
-        L.click(tr("CallPage", "call_action_start_new_call"), 10000);
+        if (!L.clickIfVisible(tr("CallPage", "call_action_start_new_call"), 5000))
+            L.clickNamed("createNewCallButton", 10000);
         snooze(1);
         var placeholder = tr("CreationFormLayout", "search_bar_look_for_contact_text");
         var field=L.waitFor(function(o){return /TextField/.test(cnn(o))&&o.visible&&ph(o)===placeholder;},10000);

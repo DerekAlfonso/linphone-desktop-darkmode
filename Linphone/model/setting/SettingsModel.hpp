@@ -63,6 +63,9 @@ public:
 	bool getEchoCancellationEnabled() const;
 	void setEchoCancellationEnabled(bool enabled);
 
+	bool getHidEnabled() const;
+	void setHidEnabled(bool enabled);
+
 	bool getNoiseSuppressionEnabled() const;
 	void setNoiseSuppressionEnabled(bool enabled);
 
@@ -134,6 +137,7 @@ public:
 	QString getVideoDevice() const;
 	void setVideoDevice(QString device);
 
+	QString getAccountCreatorUrl() const;
 	QString getDefaultDomain() const;
 
 	//------------------------------------------------------------------------------------------------------------
@@ -212,9 +216,7 @@ public:
 
 	bool autoCheckForUpdateOnStart() const;
 	void setAutoCheckForUpdateOnStart(bool check);
-	bool isCheckForUpdateAvailable() const;
 	bool isCheckForUpdateEnabled() const;
-	void setCheckForUpdateEnabled(bool enable);
 	QString getVersionCheckUrl();
 	void setVersionCheckUrl(const QString &url);
 	void setVersionCheckType(const LinphoneEnums::VersionCheckType &type);
@@ -224,6 +226,7 @@ public:
 	// UI
 	DECLARE_GETSET(bool, disableChatFeature, DisableChatFeature)
 	DECLARE_GETSET(bool, hideNotificationCounter, HideNotificationCounter)
+	DECLARE_GETSET(bool, forceLocalConference, ForceLocalConference)
 	DECLARE_GETSET(bool, disableBroadcastFeature, DisableBroadcastFeature)
 	DECLARE_GETSET(bool, disableCallForward, DisableCallForward)
 	DECLARE_GETSET(bool, hideSettings, HideSettings)
@@ -291,6 +294,7 @@ signals:
 	void cardDAVMinCharResearchChanged(int min);
 
 	void echoCancellationEnabledChanged(bool enabled);
+	void hidEnabledChanged(bool enabled);
 	void noiseSuppressionEnabledChanged(bool enabled);
 	void automaticallyRecordCallsEnabledChanged(bool enabled);
 	void autoAnswerEnabledChanged(bool enabled);
@@ -313,7 +317,6 @@ signals:
 	void showPastMeetingsChanged(bool value);
 
 	void autoCheckForUpdateOnStartChanged();
-	void checkForUpdateEnabledChanged();
 	void versionCheckUrlChanged();
 
 	void setCaptureDeviceFailed(const QString &error);

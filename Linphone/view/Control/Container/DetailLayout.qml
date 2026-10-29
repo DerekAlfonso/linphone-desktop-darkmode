@@ -18,6 +18,8 @@ ColumnLayout {
     RowLayout {
         spacing: Utils.getSizeWithScreenRatio(10)
         Text {
+            Accessible.role: Accessible.Heading
+            Accessible.name: text
             text: mainItem.label
             color: DefaultStyle.main1_500_main
             font {
@@ -30,6 +32,8 @@ ColumnLayout {
             icon.source: mainItem.icon
             style: ButtonStyle.noBackgroundOrange
             onClicked: mainItem.titleIconClicked()
+            //: "More info %1"
+            Accessible.name: qsTr("more_info_accessible_name").arg(mainItem.label)
         }
         Item {
             Layout.fillWidth: true
@@ -41,6 +45,7 @@ ColumnLayout {
             checked: true
             icon.source: checked ? AppIcons.upArrow : AppIcons.downArrow
             KeyNavigation.down: contentControl
+            Accessible.name: mainItem.label
         }
     }
     RoundedPane {

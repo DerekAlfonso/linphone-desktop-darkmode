@@ -10,6 +10,8 @@ import "qrc:/qt/qml/Linphone/view/Style/buttonStyle.js" as ButtonStyle
 import "qrc:/qt/qml/Linphone/view/Control/Tool/Helper/utils.js" as Utils
 
 ListView {
+    Accessible.role: Accessible.List
+    Accessible.name: qsTr("call_history_list_accessible_name")
     id: mainItem
     clip: true
     keyNavigationEnabled: false // We will reimplement the keyNavigation
@@ -25,6 +27,7 @@ ListView {
     property bool lastFocusByNavigationKeyboard: false // Workaround to get the correct focusReason
 
     signal resultsReceived
+    signal contextMenuRequested(var origin)
 
     onResultsReceived: {
         loading = false
@@ -147,7 +150,6 @@ ListView {
         visible: !mainItem.loading
         width: mainItem.width
         height: Utils.getSizeWithScreenRatio(56)
-        Accessible.role: Accessible.ListItem
 
         RowLayout {
             z: 1
@@ -262,6 +264,10 @@ ListView {
         }
         MouseArea {
             id: backgroundMouseArea
+            objectName: "callHistoryRow"
+            Accessible.role: Accessible.ListItem
+            Accessible.onPressAction: mainItem.currentIndex = model.index
+            Accessible.focusable: true
             hoverEnabled: true
             anchors.fill: parent
             focus: true
@@ -302,6 +308,10 @@ ListView {
             Keys.onPressed: event => {
                 if(event.key === Qt.Key_Right){
                     callButton.forceActiveFocus(Qt.TabFocusReason)
+                } else if (event.key === Qt.Key_Menu || (event.key === Qt.Key_F10 && (event.modifiers & Qt.ShiftModifier))) {
+                    mainItem.currentIndex = model.index
+                    mainItem.contextMenuRequested(backgroundMouseArea)
+                    event.accepted = true
                 }
             }
         }
