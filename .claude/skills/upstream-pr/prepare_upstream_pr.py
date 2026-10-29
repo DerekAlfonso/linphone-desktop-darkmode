@@ -78,11 +78,44 @@ def strip_blocks(text):
     return "".join(out)
 
 
+def blob(rev, path, cwd):
+    result = subprocess.run(["git", "show", f"{rev}:{path}"], cwd=cwd, capture_output=True)
+    return result.stdout.decode("utf-8") if result.returncode == 0 else None
+
+
+def remerge_stripped(wt, commit, path):
+    """Redo the 3-way merge of PATH with fork-local blocks stripped from both sides of COMMIT.
+
+    Upstream never has the blocks, so edits inside them conflict on a plain cherry-pick.
+    Returns True when the stripped merge is clean (result is staged)."""
+    base, theirs, ours = blob(f"{commit}^", path, wt), blob(commit, path, wt), blob("HEAD", path, wt)
+    if None in (base, theirs, ours):
+        return False
+    tmp = tempfile.mkdtemp(prefix="upstream-pr-merge-")
+    try:
+        files = []
+        for name, text in (("ours", ours), ("base", strip_blocks(base)), ("theirs", strip_blocks(theirs))):
+            files.append(os.path.join(tmp, name))
+            with open(files[-1], "w", encoding="utf-8", newline="") as f:
+                f.write(text)
+        if subprocess.run(["git", "merge-file", *files], capture_output=True).returncode != 0:
+            return False
+        shutil.copyfile(files[0], os.path.join(wt, path))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    git("add", "--", path, cwd=wt)
+    return True
+
+
 def filter_index(wt, specs):
     """Remove fork-local content from the staged cherry-pick. Returns touched paths."""
-    removed = lines(git("diff", "--cached", "--name-only", "--", *specs, cwd=wt))
-    if removed:
-        git("restore", "--source=HEAD", "--staged", "--worktree", "--", *removed, cwd=wt)
+    removed = sorted(set(lines(git("diff", "--cached", "--name-only", "--", *specs, cwd=wt))))
+    for path in removed:
+        # checkout/rm also settle unmerged entries (e.g. modify/delete of a tooling file).
+        if ok("cat-file", "-e", f"HEAD:{path}", cwd=wt):
+            git("checkout", "HEAD", "--", path, cwd=wt)
+        else:
+            git("rm", "-q", "-f", "--ignore-unmatch", "--", path, cwd=wt)
 
     stripped = []
     for path in lines(git("diff", "--cached", "--name-only", "--diff-filter=AM", cwd=wt)):
@@ -156,10 +189,12 @@ def main():
             if pick.returncode != 0:
                 conflicted = lines(git("diff", "--name-only", "--diff-filter=U", cwd=wt))
                 local = set(lines(git("diff", "--name-only", "--diff-filter=U", "--", *specs, cwd=wt)))
-                if not conflicted or set(conflicted) - local:
+                unresolved = [f for f in conflicted if f not in local and not remerge_stripped(wt, c, f)]
+                if not conflicted or unresolved:
                     sys.exit(f"Conflict replaying {subject} onto {args.upstream}:\n  "
-                             + "\n  ".join(sorted(set(conflicted) - local) or [pick.stderr.strip()])
-                             + "\nSync the fork with upstream (sync-upstream skill), resolve, then retry.")
+                             + "\n  ".join(unresolved or [pick.stderr.strip()])
+                             + "\nSync the fork with upstream (sync-upstream skill), rebase the work "
+                               "on master, resolve, then retry.")
             filter_index(wt, specs)
             if ok("diff", "--cached", "--quiet", cwd=wt):
                 git("reset", "--quiet", "--hard", cwd=wt)
